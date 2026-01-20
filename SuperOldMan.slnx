@@ -3,5 +3,5 @@
     <File Path="Directory.Build.props" />
     <File Path="README.md" />
   </Folder>
-  <Project Path="IntuitiveItems.BepInExMod\IntuitiveItems.BepInExMod.csproj" />
+  <Project Path="SuperOldMan.BepInExMod/SuperOldMan.BepInExMod.csproj" />
 </Solution>
