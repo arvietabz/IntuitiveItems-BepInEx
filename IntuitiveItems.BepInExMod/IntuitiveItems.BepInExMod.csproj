@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -43,5 +43,16 @@
       <HintPath>$(MEGABONK_PROFILE)\core\Il2CppInterop.Runtime.dll</HintPath>
     </Reference>
   </ItemGroup>
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Message Text="Copying to BepInEx Plugins folder..." Importance="high" />
 
+		<!-- This uses the path you defined in Directory.Build.props -->
+		<Copy SourceFiles="$(TargetPath)"
+			  DestinationFolder="$(MEGABONK_PROFILE)\plugins\"
+			  Condition="Exists('$(MEGABONK_PROFILE)')" />
+
+		<!-- Optional: Print success or warning -->
+		<Message Text="SUCCESS: Copied $(TargetFileName) to profile." Importance="high" Condition="Exists('$(MEGABONK_PROFILE)')" />
+		<Warning Text="Could not copy file! Check 'MEGABONK_PROFILE' path in Directory.Build.props" Condition="!Exists('$(MEGABONK_PROFILE)')" />
+	</Target>
 </Project>

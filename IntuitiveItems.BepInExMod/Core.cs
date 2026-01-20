@@ -85,7 +85,199 @@ namespace IntuitiveItems
                 string rarityName = item.rarity.ToString();
                 string sectionName = $"{(int)item.rarity}. {rarityName}";
 
-                int defaultVal = (itemName == "Key") ? 10 : -1;
+                int defaultVal = -1; // -1 means "No Limit" (the default for everything else)
+
+                switch (itemName)
+                {
+                    case "Borgar":
+                        defaultVal = 1;
+                        break;
+
+                    case "BossBuster":
+                        defaultVal = 7;
+                        break;
+
+                    case "CursedDoll":
+                        defaultVal = 1;
+                        break;
+
+                    case "Ghost":
+                        defaultVal = 1;
+                        break;
+
+                    case "Key":
+                        defaultVal = 10;
+                        break;
+
+                    case "Medkit":
+                        defaultVal = 3;
+                        break;
+
+                    case "MoldyCheese":
+                        defaultVal = 3;
+                        break;
+
+                    case "TacticalGlasses":
+                        defaultVal = 5;
+                        break;
+
+                    case "Beer":
+                        defaultVal = 10;
+                        break;
+
+                    case "BrassKnuckles":
+                        defaultVal = 4;
+                        break;
+
+                    case "Campfire":
+                        defaultVal = 1;
+                        break;
+
+                    case "CowardsCloak":
+                        defaultVal = 1;
+                        break;
+
+                    case "CreditCardRed":
+                        defaultVal = 10;
+                        break;
+
+                    case "DemonBlade":
+                        defaultVal = 4;
+                        break;
+
+                    case "ElectricPlug":
+                        defaultVal = 1;
+                        break;
+
+                    case "GoldenShield":
+                        defaultVal = 1;
+                        break;
+
+                    case "UnstableTransfusion":
+                        defaultVal = 3;
+                        break;
+
+                    case "BobsLantern":
+                        defaultVal = 1;
+                        break;
+
+                    case "CreditCardGreen":
+                        defaultVal = 10;
+                        break;
+
+                    case "DemonicSoul":
+                        defaultVal = 10;
+                        break;
+
+                    case "Gasmask":
+                        defaultVal = 1;
+                        break;
+
+                    case "GloveBlood":
+                        defaultVal = 1;
+                        break;
+
+                    case "GrandmasSecretTonic":
+                        defaultVal = 2;
+                        break;
+
+                    case "Kevin":
+                        defaultVal = 1;
+                        break;
+
+                    case "Mirror":
+                        defaultVal = 1;
+                        break;
+
+                    case "SluttyCannon":
+                        defaultVal = 5;
+                        break;
+
+                    case "ToxicBarrel":
+                        defaultVal = 1;
+                        break;
+
+                    case "Anvil":
+                        defaultVal = 3;
+                        break;
+
+                    case "BloodyCleaver":
+                        defaultVal = 2;
+                        break;
+
+                    case "Bonker":
+                        defaultVal = 5;
+                        break;
+
+                    case "Chonkplate":
+                        defaultVal = 10;
+                        break;
+
+                    case "Dragonfire":
+                        defaultVal = 7;
+                        break;
+
+                    case "EnergyCore":
+                        defaultVal = 1;
+                        break;
+
+                    case "GiantFork":
+                        defaultVal = 7;
+                        break;
+
+                    case "GlovePower":
+                        defaultVal = 1;
+                        break;
+
+                    case "GoldenRing":
+                        defaultVal = 1;
+                        break;
+
+                    case "HolyBook":
+                        defaultVal = 2;
+                        break;
+
+                    case "IceCube":
+                        defaultVal = 5;
+                        break;
+
+                    case "JoesDagger":
+                        defaultVal = 10;
+                        break;
+
+                    case "LightningOrb":
+                        defaultVal = 4;
+                        break;
+
+                    case "OverpoweredLamp":
+                        defaultVal = 5;
+                        break;
+
+                    case "Snek":
+                        defaultVal = 10;
+                        break;
+
+                    case "SoulHarvester":
+                        defaultVal = 1;
+                        break;
+
+                    case "SpeedBoi":
+                        defaultVal = 1;
+                        break;
+
+                    case "SpicyMeatball":
+                        defaultVal = 4;
+                        break;
+
+                    case "SuckyMagnet":
+                        defaultVal = 2;
+                        break;
+
+                    case "ZaWarudo":
+                        defaultVal = 1;
+                        break;
+
+                }
 
                 var entry = Config.Bind(sectionName, itemName, defaultVal,
                     $"Max amount of {itemName} to hold.");
