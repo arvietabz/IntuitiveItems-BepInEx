@@ -1,7 +1,0 @@
-<Project>
-	<PropertyGroup>
-		<!-- Adjust these paths to match your actual installation -->
-		<MEGABONK_DIR>D:\SteamLibrary\steamapps\common\Megabonk</MEGABONK_DIR>
-		<MEGABONK_PROFILE>C:\Users\Arvie\AppData\Roaming\r2modmanPlus-local\Megabonk\profiles\TestRun\BepInEx</MEGABONK_PROFILE>
-	</PropertyGroup>
-</Project>

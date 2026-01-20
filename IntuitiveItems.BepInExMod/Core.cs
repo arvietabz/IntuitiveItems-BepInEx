@@ -19,15 +19,23 @@ namespace IntuitiveItems
     {
         public const string GUID = "com.arvietabz.intuitiveitems";
         public const string NAME = "IntuitiveItems";
-        public const string VERSION = "1.0.1"; // Bumped version
+        public const string VERSION = "1.0.5"; // Final Polish Version
 
         public static Core Instance;
+
+        // Config Entries
+        public ConfigEntry<bool> _keysFirstConfig;
 
         public System.Collections.Generic.Dictionary<EItem, ConfigEntry<int>> _itemLimits
             = new System.Collections.Generic.Dictionary<EItem, ConfigEntry<int>>();
 
+        // Caches
         public System.Collections.Generic.Dictionary<EItem, ItemData> _itemDataCache
             = new System.Collections.Generic.Dictionary<EItem, ItemData>();
+
+        // Tracks which items are genuinely unlocked by the player to prevent spoilers
+        private System.Collections.Generic.HashSet<EItem> _allowedItems
+            = new System.Collections.Generic.HashSet<EItem>();
 
         public bool _isConfigInitialized = false;
 
@@ -44,15 +52,15 @@ namespace IntuitiveItems
 
         public void TryInitializeConfig()
         {
-            // NEW METHOD: Find ALL ItemData assets in the entire game memory
-            // This bypasses the "Available Items" list and gets everything.
             var allAssets = Resources.FindObjectsOfTypeAll(Il2CppType.Of<ItemData>());
-
             if (allAssets == null || allAssets.Length == 0) return;
 
-            // Log how many raw assets we found to debug
-            Log.LogInfo($"Found {allAssets.Length} raw ItemData assets in memory.");
+            // 1. Bind General Config
+            // CHANGED SECTION NAME: "-- General --" sorts before "0. Common"
+            _keysFirstConfig = Config.Bind("-- General --", "Keys First", false,
+                "If set to true: Only Keys and Legendary items will spawn until you reach your Key limit. Once reached, other unlocked items will spawn.");
 
+            // 2. Process Items
             var uniqueItems = new System.Collections.Generic.List<ItemData>();
             var processedEnums = new System.Collections.Generic.HashSet<EItem>();
 
@@ -60,23 +68,17 @@ namespace IntuitiveItems
             {
                 ItemData item = obj.TryCast<ItemData>();
                 if (item == null) continue;
-
-                // Deduplicate: If we already processed this Enum ID, skip it.
                 if (processedEnums.Contains(item.eItem)) continue;
 
                 uniqueItems.Add(item);
                 processedEnums.Add(item.eItem);
 
-                // Add to cache for logic later
                 if (!_itemDataCache.ContainsKey(item.eItem))
                 {
                     _itemDataCache[item.eItem] = item;
                 }
             }
 
-            Log.LogInfo($"Identified {uniqueItems.Count} unique items for Config.");
-
-            // Sort by Rarity -> Name
             var sortedItems = uniqueItems.ToArray().OrderBy(x => (int)x.rarity).ThenBy(x => x.eItem.ToString());
 
             foreach (var item in sortedItems)
@@ -85,209 +87,85 @@ namespace IntuitiveItems
                 string rarityName = item.rarity.ToString();
                 string sectionName = $"{(int)item.rarity}. {rarityName}";
 
-                int defaultVal = -1; // -1 means "No Limit" (the default for everything else)
+                int defaultVal = -1; // Default is Infinite
 
+                // CUSTOM DEFAULTS
                 switch (itemName)
                 {
-                    case "Borgar":
-                        defaultVal = 1;
-                        break;
-
-                    case "BossBuster":
-                        defaultVal = 7;
-                        break;
-
-                    case "CursedDoll":
-                        defaultVal = 1;
-                        break;
-
-                    case "Ghost":
-                        defaultVal = 1;
-                        break;
-
-                    case "Key":
-                        defaultVal = 10;
-                        break;
-
-                    case "Medkit":
-                        defaultVal = 3;
-                        break;
-
-                    case "MoldyCheese":
-                        defaultVal = 3;
-                        break;
-
-                    case "TacticalGlasses":
-                        defaultVal = 5;
-                        break;
-
-                    case "Beer":
-                        defaultVal = 10;
-                        break;
-
-                    case "BrassKnuckles":
-                        defaultVal = 4;
-                        break;
-
-                    case "Campfire":
-                        defaultVal = 1;
-                        break;
-
-                    case "CowardsCloak":
-                        defaultVal = 1;
-                        break;
-
-                    case "CreditCardRed":
-                        defaultVal = 10;
-                        break;
-
-                    case "DemonBlade":
-                        defaultVal = 4;
-                        break;
-
-                    case "ElectricPlug":
-                        defaultVal = 1;
-                        break;
-
-                    case "GoldenShield":
-                        defaultVal = 1;
-                        break;
-
-                    case "UnstableTransfusion":
-                        defaultVal = 3;
-                        break;
-
-                    case "BobsLantern":
-                        defaultVal = 1;
-                        break;
-
-                    case "CreditCardGreen":
-                        defaultVal = 10;
-                        break;
-
-                    case "DemonicSoul":
-                        defaultVal = 10;
-                        break;
-
-                    case "Gasmask":
-                        defaultVal = 1;
-                        break;
-
-                    case "GloveBlood":
-                        defaultVal = 1;
-                        break;
-
-                    case "GrandmasSecretTonic":
-                        defaultVal = 2;
-                        break;
-
-                    case "Kevin":
-                        defaultVal = 1;
-                        break;
-
-                    case "Mirror":
-                        defaultVal = 1;
-                        break;
-
-                    case "SluttyCannon":
-                        defaultVal = 5;
-                        break;
-
-                    case "ToxicBarrel":
-                        defaultVal = 1;
-                        break;
-
-                    case "Anvil":
-                        defaultVal = 3;
-                        break;
-
-                    case "BloodyCleaver":
-                        defaultVal = 2;
-                        break;
-
-                    case "Bonker":
-                        defaultVal = 5;
-                        break;
-
-                    case "Chonkplate":
-                        defaultVal = 10;
-                        break;
-
-                    case "Dragonfire":
-                        defaultVal = 7;
-                        break;
-
-                    case "EnergyCore":
-                        defaultVal = 1;
-                        break;
-
-                    case "GiantFork":
-                        defaultVal = 7;
-                        break;
-
-                    case "GlovePower":
-                        defaultVal = 1;
-                        break;
-
-                    case "GoldenRing":
-                        defaultVal = 1;
-                        break;
-
-                    case "HolyBook":
-                        defaultVal = 2;
-                        break;
-
-                    case "IceCube":
-                        defaultVal = 5;
-                        break;
-
-                    case "JoesDagger":
-                        defaultVal = 10;
-                        break;
-
-                    case "LightningOrb":
-                        defaultVal = 4;
-                        break;
-
-                    case "OverpoweredLamp":
-                        defaultVal = 5;
-                        break;
-
-                    case "Snek":
-                        defaultVal = 10;
-                        break;
-
-                    case "SoulHarvester":
-                        defaultVal = 1;
-                        break;
-
-                    case "SpeedBoi":
-                        defaultVal = 1;
-                        break;
-
-                    case "SpicyMeatball":
-                        defaultVal = 4;
-                        break;
-
-                    case "SuckyMagnet":
-                        defaultVal = 2;
-                        break;
-
-                    case "ZaWarudo":
-                        defaultVal = 1;
-                        break;
-
+                    case "Borgar": defaultVal = 1; break;
+                    case "BossBuster": defaultVal = 7; break;
+                    case "CursedDoll": defaultVal = 1; break;
+                    case "Ghost": defaultVal = 1; break;
+                    case "Key": defaultVal = 10; break;
+                    case "Medkit": defaultVal = 3; break;
+                    case "MoldyCheese": defaultVal = 3; break;
+                    case "TacticalGlasses": defaultVal = 5; break;
+                    case "Beer": defaultVal = 10; break;
+                    case "BrassKnuckles": defaultVal = 4; break;
+                    case "Campfire": defaultVal = 1; break;
+                    case "CowardsCloak": defaultVal = 1; break;
+                    case "CreditCardRed": defaultVal = 10; break;
+                    case "DemonBlade": defaultVal = 4; break;
+                    case "ElectricPlug": defaultVal = 1; break;
+                    case "GoldenShield": defaultVal = 1; break;
+                    case "UnstableTransfusion": defaultVal = 3; break;
+                    case "BobsLantern": defaultVal = 1; break;
+                    case "CreditCardGreen": defaultVal = 10; break;
+                    case "DemonicSoul": defaultVal = 10; break;
+                    case "Gasmask": defaultVal = 1; break;
+                    case "GloveBlood": defaultVal = 1; break;
+                    case "GrandmasSecretTonic": defaultVal = 2; break;
+                    case "Kevin": defaultVal = 1; break;
+                    case "Mirror": defaultVal = 1; break;
+                    case "SluttyCannon": defaultVal = 5; break;
+                    case "ToxicBarrel": defaultVal = 1; break;
+                    case "Anvil": defaultVal = 3; break;
+                    case "BloodyCleaver": defaultVal = 2; break;
+                    case "Bonker": defaultVal = 5; break;
+                    case "Chonkplate": defaultVal = 10; break;
+                    case "Dragonfire": defaultVal = 7; break;
+                    case "EnergyCore": defaultVal = 1; break;
+                    case "GiantFork": defaultVal = 7; break;
+                    case "GlovePower": defaultVal = 1; break;
+                    case "GoldenRing": defaultVal = 1; break;
+                    case "HolyBook": defaultVal = 2; break;
+                    case "IceCube": defaultVal = 5; break;
+                    case "JoesDagger": defaultVal = 10; break;
+                    case "LightningOrb": defaultVal = 4; break;
+                    case "OverpoweredLamp": defaultVal = 5; break;
+                    case "Snek": defaultVal = 10; break;
+                    case "SoulHarvester": defaultVal = 1; break;
+                    case "SpeedBoi": defaultVal = 1; break;
+                    case "SpicyMeatball": defaultVal = 4; break;
+                    case "SuckyMagnet": defaultVal = 2; break;
+                    case "ZaWarudo": defaultVal = 1; break;
                 }
 
-                var entry = Config.Bind(sectionName, itemName, defaultVal,
-                    $"Max amount of {itemName} to hold.");
-
+                var entry = Config.Bind(sectionName, itemName, defaultVal, $"Max amount of {itemName} to hold.");
                 _itemLimits[item.eItem] = entry;
             }
 
             Config.Save();
             _isConfigInitialized = true;
             Log.LogInfo("Sorted Config Generation Complete!");
+        }
+
+        // Helper to scan for unlocked items
+        public void UpdateAllowedItemsList()
+        {
+            if (RunUnlockables.availableItems == null) return;
+
+            foreach (var rarityObj in System.Enum.GetValues(typeof(EItemRarity)))
+            {
+                EItemRarity rarity = (EItemRarity)rarityObj;
+                if (RunUnlockables.availableItems.TryGetValue(rarity, out var list) && list != null)
+                {
+                    foreach (var item in list)
+                    {
+                        _allowedItems.Add(item.eItem);
+                    }
+                }
+            }
         }
 
         public void ApplySmartLootLogic()
@@ -302,32 +180,85 @@ namespace IntuitiveItems
             if (player == null || player.inventory == null || player.inventory.itemInventory == null) return;
             if (RunUnlockables.availableItems == null) return;
 
-            foreach (var kvp in _itemLimits)
+            // Record what is genuinely unlocked
+            UpdateAllowedItemsList();
+
+            bool keysFirstEnabled = _keysFirstConfig.Value;
+            int currentKeys = player.inventory.itemInventory.GetAmount(EItem.Key);
+
+            int keyTarget = 10;
+            if (_itemLimits.ContainsKey(EItem.Key)) keyTarget = _itemLimits[EItem.Key].Value;
+
+            // =========================================================
+            // PHASE 1: LOCKDOWN (Keys First)
+            // =========================================================
+            if (keysFirstEnabled && currentKeys < keyTarget)
             {
-                EItem itemEnum = kvp.Key;
-                int limit = kvp.Value.Value;
-
-                if (limit < 0) continue;
-                if (!_itemDataCache.ContainsKey(itemEnum)) continue;
-
-                ItemData itemData = _itemDataCache[itemEnum];
-                EItemRarity rarity = itemData.rarity;
-                int currentAmount = player.inventory.itemInventory.GetAmount(itemEnum);
-
-                List<ItemData> lootList = null;
-                // We still check availableItems here because we can only remove items 
-                // that are actually IN the loot pool for this run.
-                if (!RunUnlockables.availableItems.TryGetValue(rarity, out lootList) || lootList == null) continue;
-
-                bool isInPool = lootList.Contains(itemData);
-
-                if (currentAmount >= limit)
+                foreach (var kvp in _itemDataCache)
                 {
-                    if (isInPool) lootList.Remove(itemData);
+                    ItemData itemData = kvp.Value;
+                    EItemRarity rarity = itemData.rarity;
+
+                    List<ItemData> lootList = null;
+                    if (!RunUnlockables.availableItems.TryGetValue(rarity, out lootList) || lootList == null) continue;
+
+                    bool isKey = (itemData.eItem == EItem.Key);
+                    bool isLegendary = (rarity == EItemRarity.Legendary);
+                    bool isInPool = lootList.Contains(itemData);
+
+                    // Skip locked items
+                    if (!_allowedItems.Contains(itemData.eItem)) continue;
+
+                    if (isKey || isLegendary)
+                    {
+                        if (!isInPool) lootList.Add(itemData);
+                    }
+                    else
+                    {
+                        if (isInPool) lootList.Remove(itemData);
+                    }
                 }
-                else
+            }
+            // =========================================================
+            // PHASE 2: STANDARD (Limits)
+            // =========================================================
+            else
+            {
+                foreach (var kvp in _itemDataCache)
                 {
-                    if (!isInPool) lootList.Add(itemData);
+                    EItem itemEnum = kvp.Key;
+                    ItemData itemData = kvp.Value;
+                    EItemRarity rarity = itemData.rarity;
+
+                    List<ItemData> lootList = null;
+                    if (!RunUnlockables.availableItems.TryGetValue(rarity, out lootList) || lootList == null) continue;
+
+                    // Skip locked items
+                    if (!_allowedItems.Contains(itemEnum)) continue;
+
+                    int limit = -1;
+                    if (_itemLimits.ContainsKey(itemEnum)) limit = _itemLimits[itemEnum].Value;
+
+                    bool isInPool = lootList.Contains(itemData);
+
+                    // Infinite Limit (-1)
+                    if (limit < 0)
+                    {
+                        if (!isInPool) lootList.Add(itemData);
+                        continue;
+                    }
+
+                    // Numbered Limit
+                    int currentAmount = player.inventory.itemInventory.GetAmount(itemEnum);
+
+                    if (currentAmount >= limit)
+                    {
+                        if (isInPool) lootList.Remove(itemData);
+                    }
+                    else
+                    {
+                        if (!isInPool) lootList.Add(itemData);
+                    }
                 }
             }
         }
