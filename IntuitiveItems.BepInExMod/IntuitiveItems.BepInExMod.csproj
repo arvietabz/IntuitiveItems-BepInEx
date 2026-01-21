@@ -1,57 +1,68 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <AssemblyName>IntuitiveItems</AssemblyName>
-    <Description>Configurable Item Limits for Megabonk</Description>
-    <Version>1.0.0</Version>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <LangVersion>latest</LangVersion>
-    <RestoreAdditionalProjectSources>
-      https://api.nuget.org/v3/index.json;
-      https://nuget.bepinex.dev/v3/index.json
-    </RestoreAdditionalProjectSources>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net6.0</TargetFramework>
+		<AssemblyName>IntuitiveItems</AssemblyName>
+		<Description>Configurable Item Limits for Megabonk</Description>
+		<Version>1.2.1</Version>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<LangVersion>latest</LangVersion>
+		<RestoreAdditionalProjectSources>
+			https://api.nuget.org/v3/index.json;
+			https://nuget.bepinex.dev/v3/index.json
+		</RestoreAdditionalProjectSources>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.*" IncludeAssets="compile" />
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="BepInEx.Unity.IL2CPP" Version="6.0.0-be.*" IncludeAssets="compile" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <!-- Game References -->
-    <Reference Include="Assembly-CSharp">
-      <HintPath>$(MEGABONK_PROFILE)\interop\Assembly-CSharp.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine">
-      <HintPath>$(MEGABONK_PROFILE)\interop\UnityEngine.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.CoreModule">
-      <HintPath>$(MEGABONK_PROFILE)\interop\UnityEngine.CoreModule.dll</HintPath>
-    </Reference>
+	<ItemGroup>
+		<!-- Game References -->
+		<Reference Include="Assembly-CSharp">
+			<HintPath>$(MEGABONK_PROFILE)\interop\Assembly-CSharp.dll</HintPath>
+		</Reference>
+		<Reference Include="UnityEngine">
+			<HintPath>$(MEGABONK_PROFILE)\interop\UnityEngine.dll</HintPath>
+		</Reference>
+		<Reference Include="UnityEngine.UI">
+			<HintPath>$(MEGABONK_PROFILE)\interop\UnityEngine.UI.dll</HintPath>
+		</Reference>
+		<Reference Include="UnityEngine.CoreModule">
+			<HintPath>$(MEGABONK_PROFILE)\interop\UnityEngine.CoreModule.dll</HintPath>
+		</Reference>
+		<Reference Include="UnityEngine.InputLegacyModule">
+			<HintPath>$(MEGABONK_PROFILE)\interop\UnityEngine.InputLegacyModule.dll</HintPath>
+		</Reference>
 
-    <!-- IL2CPP System References -->
-    <Reference Include="Il2Cppmscorlib">
-      <HintPath>$(MEGABONK_PROFILE)\interop\Il2Cppmscorlib.dll</HintPath>
-    </Reference>
-    <Reference Include="Il2CppSystem.Core">
-      <HintPath>$(MEGABONK_PROFILE)\interop\Il2CppSystem.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="Il2CppSystem">
-      <HintPath>$(MEGABONK_PROFILE)\interop\Il2CppSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="Il2CppInterop.Runtime">
-      <HintPath>$(MEGABONK_PROFILE)\core\Il2CppInterop.Runtime.dll</HintPath>
-    </Reference>
-  </ItemGroup>
+		<!-- NEW REFERENCES FOR UI FONTS AND TEXTMESHPRO -->
+		<Reference Include="UnityEngine.TextRenderingModule">
+			<HintPath>$(MEGABONK_PROFILE)\interop\UnityEngine.TextRenderingModule.dll</HintPath>
+		</Reference>
+		<Reference Include="Unity.TextMeshPro">
+			<HintPath>$(MEGABONK_PROFILE)\interop\Unity.TextMeshPro.dll</HintPath>
+		</Reference>
+
+		<!-- IL2CPP System References -->
+		<Reference Include="Il2Cppmscorlib">
+			<HintPath>$(MEGABONK_PROFILE)\interop\Il2Cppmscorlib.dll</HintPath>
+		</Reference>
+		<Reference Include="Il2CppSystem.Core">
+			<HintPath>$(MEGABONK_PROFILE)\interop\Il2CppSystem.Core.dll</HintPath>
+		</Reference>
+		<Reference Include="Il2CppSystem">
+			<HintPath>$(MEGABONK_PROFILE)\interop\Il2CppSystem.dll</HintPath>
+		</Reference>
+		<Reference Include="Il2CppInterop.Runtime">
+			<HintPath>$(MEGABONK_PROFILE)\core\Il2CppInterop.Runtime.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
 		<Message Text="Copying to BepInEx Plugins folder..." Importance="high" />
-
-		<!-- This uses the path you defined in Directory.Build.props -->
 		<Copy SourceFiles="$(TargetPath)"
 			  DestinationFolder="$(MEGABONK_PROFILE)\plugins\"
 			  Condition="Exists('$(MEGABONK_PROFILE)')" />
-
-		<!-- Optional: Print success or warning -->
 		<Message Text="SUCCESS: Copied $(TargetFileName) to profile." Importance="high" Condition="Exists('$(MEGABONK_PROFILE)')" />
 		<Warning Text="Could not copy file! Check 'MEGABONK_PROFILE' path in Directory.Build.props" Condition="!Exists('$(MEGABONK_PROFILE)')" />
 	</Target>
