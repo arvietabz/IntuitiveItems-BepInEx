@@ -1,4 +1,4 @@
-# IntuitiveItems
+# Intuitive Items for Megabonk (BepInExMod)
 
 An intelligent inventory manager that lets you define a maximum carry limit for any item in the game. Say goodbye to finding useless dupes once you've already hit your stack goal!
 
