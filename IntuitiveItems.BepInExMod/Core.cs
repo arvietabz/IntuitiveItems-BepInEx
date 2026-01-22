@@ -22,7 +22,7 @@ namespace IntuitiveItems
     {
         public const string GUID = "com.arvietabz.intuitiveitems";
         public const string NAME = "IntuitiveItems";
-        public const string VERSION = "1.8.2"; // Compatibility Fix
+        public const string VERSION = "1.9.2"; // Priority Fix: Strict overrides Keys
 
         public static Core Instance;
         private Harmony _harmony;
@@ -248,39 +248,13 @@ namespace IntuitiveItems
             int keyTarget = 10;
             if (_itemLimits.ContainsKey(EItem.Key)) keyTarget = _itemLimits[EItem.Key].Value;
 
-            // 1. PRIORITY: KEYS FIRST MODE
-            if (keysFirstEnabled && currentKeys < keyTarget)
-            {
-                foreach (var kvp in _itemDataCache)
-                {
-                    ItemData itemData = kvp.Value;
-
-                    // COMPATIBILITY FIX: Don't touch items disabled by user/ToggleEverything
-                    if (!itemData.isEnabled) continue;
-
-                    EItemRarity rarity = itemData.rarity;
-                    List<ItemData> lootList = null;
-                    if (!RunUnlockables.availableItems.TryGetValue(rarity, out lootList) || lootList == null) continue;
-                    if (!_allowedItems.Contains(itemData.eItem)) continue;
-
-                    bool isKey = (itemData.eItem == EItem.Key);
-                    bool isLegendary = (rarity == EItemRarity.Legendary);
-                    bool isCreditCard = (itemData.eItem == EItem.CreditCardGreen || itemData.eItem == EItem.CreditCardRed);
-                    bool isInPool = lootList.Contains(itemData);
-
-                    if (isKey || isLegendary || isCreditCard) { if (!isInPool) lootList.Add(itemData); }
-                    else { if (isInPool) lootList.Remove(itemData); }
-                }
-                return;
-            }
-
-            // 2. CHAIN LOGIC
             bool chainEnabled = _chainEnabledConfig.Value;
             bool strictMode = _strictChainConfig.Value;
 
             ItemData targetChainItem = null;
             bool chainComplete = true;
 
+            // Calculate Chain Target
             if (chainEnabled && _parsedChainList.Count > 0)
             {
                 foreach (var chainItemEnum in _parsedChainList)
@@ -297,75 +271,81 @@ namespace IntuitiveItems
                 }
             }
 
-            // 2A. STRICT PROGRESSION MODE
+            // =========================================================
+            // 1. STRICT MODE (HIGHEST PRIORITY)
+            // =========================================================
             if (chainEnabled && strictMode && !chainComplete && targetChainItem != null)
             {
-                foreach (var rarityObj in System.Enum.GetValues(typeof(EItemRarity)))
+                foreach (var kvp in _itemDataCache)
                 {
-                    EItemRarity rarity = (EItemRarity)rarityObj;
+                    ItemData itemData = kvp.Value;
+                    if (!itemData.isEnabled) continue; // Compatibility check
+
+                    EItemRarity rarity = itemData.rarity;
                     List<ItemData> lootList = null;
                     if (!RunUnlockables.availableItems.TryGetValue(rarity, out lootList) || lootList == null) continue;
+                    if (!_allowedItems.Contains(itemData.eItem)) continue;
 
-                    var itemsInPool = lootList.ToArray();
+                    bool isInPool = lootList.Contains(itemData);
+                    bool shouldAdd = false;
 
-                    foreach (var itemData in itemsInPool)
+                    bool isTarget = (itemData.eItem == targetChainItem.eItem);
+                    bool isKey = (itemData.eItem == EItem.Key);
+
+                    // STRICT RULES:
+                    // 1. Target Item: ALWAYS ALLOW
+                    // 2. Key: ALLOW IF (Keys First is ON AND Keys < 10)
+                    // 3. Credit Cards: BANNED (This fixes your issue)
+
+                    if (isTarget)
                     {
-                        // COMPATIBILITY FIX
-                        if (!itemData.isEnabled) continue;
-                        if (!_allowedItems.Contains(itemData.eItem)) continue;
-
-                        bool isTarget = (itemData.eItem == targetChainItem.eItem);
-                        bool isKey = (itemData.eItem == EItem.Key);
-                        bool isCreditCard = (itemData.eItem == EItem.CreditCardGreen || itemData.eItem == EItem.CreditCardRed);
-
-                        bool shouldKeep = false;
-
-                        if (isTarget)
-                        {
-                            shouldKeep = true;
-                        }
-                        else if (isKey)
-                        {
-                            if (currentKeys < keyTarget) shouldKeep = true;
-                        }
-                        else if (isCreditCard)
-                        {
-                            int cardLimit = -1;
-                            if (_itemLimits.ContainsKey(itemData.eItem)) cardLimit = _itemLimits[itemData.eItem].Value;
-                            int currentCards = player.inventory.itemInventory.GetAmount(itemData.eItem);
-                            if (cardLimit < 0 || currentCards < cardLimit) shouldKeep = true;
-                        }
-
-                        if (shouldKeep) { /* Keep */ }
-                        else { lootList.Remove(itemData); }
+                        shouldAdd = true;
+                    }
+                    else if (isKey)
+                    {
+                        if (keysFirstEnabled && currentKeys < keyTarget) shouldAdd = true;
                     }
 
-                    // SAFETY FALLBACKS
-                    if (lootList.Count == 0)
-                    {
-                        if (rarity == EItemRarity.Common && _itemDataCache.ContainsKey(EItem.Key) && _itemDataCache[EItem.Key].isEnabled)
-                            lootList.Add(_itemDataCache[EItem.Key]);
+                    if (shouldAdd) { if (!isInPool) lootList.Add(itemData); }
+                    else { if (isInPool) lootList.Remove(itemData); }
+                }
+                return; // STOP. Do not proceed to Keys First logic.
+            }
 
-                        else if (rarity == EItemRarity.Rare && _itemDataCache.ContainsKey(EItem.CreditCardRed) && _itemDataCache[EItem.CreditCardRed].isEnabled)
-                            lootList.Add(_itemDataCache[EItem.CreditCardRed]);
+            // =========================================================
+            // 2. KEYS FIRST MODE (Secondary Priority)
+            // =========================================================
+            if (keysFirstEnabled && currentKeys < keyTarget)
+            {
+                foreach (var kvp in _itemDataCache)
+                {
+                    ItemData itemData = kvp.Value;
+                    if (!itemData.isEnabled) continue; // Compatibility check
 
-                        else if (rarity == EItemRarity.Epic && _itemDataCache.ContainsKey(EItem.CreditCardGreen) && _itemDataCache[EItem.CreditCardGreen].isEnabled)
-                            lootList.Add(_itemDataCache[EItem.CreditCardGreen]);
+                    EItemRarity rarity = itemData.rarity;
+                    List<ItemData> lootList = null;
+                    if (!RunUnlockables.availableItems.TryGetValue(rarity, out lootList) || lootList == null) continue;
+                    if (!_allowedItems.Contains(itemData.eItem)) continue;
 
-                        else if (rarity == EItemRarity.Legendary && _itemDataCache.ContainsKey(EItem.SpicyMeatball) && _itemDataCache[EItem.SpicyMeatball].isEnabled)
-                            lootList.Add(_itemDataCache[EItem.SpicyMeatball]);
-                    }
+                    bool isKey = (itemData.eItem == EItem.Key);
+                    bool isLegendary = (rarity == EItemRarity.Legendary);
+                    bool isCreditCard = (itemData.eItem == EItem.CreditCardGreen || itemData.eItem == EItem.CreditCardRed);
+                    bool isInPool = lootList.Contains(itemData);
+
+                    // Keys First Rules: Keys + Legendaries + Cards
+                    if (isKey || isLegendary || isCreditCard) { if (!isInPool) lootList.Add(itemData); }
+                    else { if (isInPool) lootList.Remove(itemData); }
                 }
                 return;
             }
 
-            // 2B & 3. STANDARD LIMITS
+            // =========================================================
+            // 3. STANDARD MODE (Limits + Chain Lockout)
+            // =========================================================
             foreach (var kvp in _itemDataCache)
             {
                 EItem itemEnum = kvp.Key;
                 ItemData itemData = kvp.Value;
-
-                // COMPATIBILITY FIX
                 if (!itemData.isEnabled) continue;
 
                 EItemRarity rarity = itemData.rarity;
@@ -393,8 +373,6 @@ namespace IntuitiveItems
 
                     if (!_itemDataCache.ContainsKey(currItem)) continue;
                     ItemData currData = _itemDataCache[currItem];
-
-                    // COMPATIBILITY FIX
                     if (!currData.isEnabled) continue;
 
                     List<ItemData> lootList = null;
