@@ -22,12 +22,15 @@ namespace IntuitiveItems
     {
         public const string GUID = "com.arvietabz.intuitiveitems";
         public const string NAME = "IntuitiveItems";
-        public const string VERSION = "1.5.2"; // Double Border UI Update
+        public const string VERSION = "1.8.0"; // Pure Strict Mode
 
         public static Core Instance;
         private Harmony _harmony;
 
         public ConfigEntry<bool> _keysFirstConfig;
+        public ConfigEntry<bool> _chainEnabledConfig;
+        public ConfigEntry<bool> _strictChainConfig;
+        public ConfigEntry<string> _chainOrderConfig;
 
         public System.Collections.Generic.Dictionary<EItem, ConfigEntry<int>> _itemLimits
             = new System.Collections.Generic.Dictionary<EItem, ConfigEntry<int>>();
@@ -37,6 +40,9 @@ namespace IntuitiveItems
 
         private System.Collections.Generic.HashSet<EItem> _allowedItems
             = new System.Collections.Generic.HashSet<EItem>();
+
+        public System.Collections.Generic.List<EItem> _parsedChainList
+            = new System.Collections.Generic.List<EItem>();
 
         public bool _isConfigInitialized = false;
 
@@ -73,8 +79,12 @@ namespace IntuitiveItems
             var allAssets = Resources.FindObjectsOfTypeAll(Il2CppType.Of<ItemData>());
             if (allAssets == null || allAssets.Length == 0) return;
 
-            _keysFirstConfig = Config.Bind("-- General --", "Keys First", false,
-                "If set to true: Only Keys, Legendaries, and Credit Cards will spawn until you reach your Key limit.");
+            _keysFirstConfig = Config.Bind("-- General --", "Keys First", false, "If ON: Prioritize Keys.");
+            _chainEnabledConfig = Config.Bind("-- General --", "Chain Enabled", false, "If ON: Progression Chain is active.");
+            _strictChainConfig = Config.Bind("-- General --", "Strict Chain Mode", false, "If ON: Strict mode.");
+            _chainOrderConfig = Config.Bind("-- General --", "Chain Order", "SpicyMeatball, JoesDagger, Bonker, SluttyCannon, CursedDoll", "Order of progression.");
+
+            ParseChainOrder();
 
             var uniqueItems = new System.Collections.Generic.List<ItemData>();
             var processedEnums = new System.Collections.Generic.HashSet<EItem>();
@@ -192,6 +202,24 @@ namespace IntuitiveItems
             _isConfigInitialized = true;
         }
 
+        private void ParseChainOrder()
+        {
+            _parsedChainList.Clear();
+            string raw = _chainOrderConfig.Value;
+            if (string.IsNullOrEmpty(raw)) return;
+            string[] parts = raw.Split(',');
+            foreach (var part in parts)
+            {
+                string cleanName = part.Trim();
+                try
+                {
+                    EItem itemEnum = (EItem)System.Enum.Parse(typeof(EItem), cleanName);
+                    _parsedChainList.Add(itemEnum);
+                }
+                catch { }
+            }
+        }
+
         public void UpdateAllowedItemsList()
         {
             if (RunUnlockables.availableItems == null) return;
@@ -215,14 +243,81 @@ namespace IntuitiveItems
 
             UpdateAllowedItemsList();
 
+            // 1. Gather Context
             bool keysFirstEnabled = _keysFirstConfig.Value;
             int currentKeys = player.inventory.itemInventory.GetAmount(EItem.Key);
             int keyTarget = 10;
             if (_itemLimits.ContainsKey(EItem.Key)) keyTarget = _itemLimits[EItem.Key].Value;
 
+            bool chainEnabled = _chainEnabledConfig.Value;
+            bool strictMode = _strictChainConfig.Value;
+
+            // Determine Chain Target
+            ItemData targetChainItem = null;
+            bool chainComplete = true; // Assume complete
+
+            if (chainEnabled && _parsedChainList.Count > 0)
+            {
+                foreach (var chainItemEnum in _parsedChainList)
+                {
+                    int amt = player.inventory.itemInventory.GetAmount(chainItemEnum);
+                    if (amt < 1)
+                    {
+                        if (_itemDataCache.ContainsKey(chainItemEnum))
+                            targetChainItem = _itemDataCache[chainItemEnum];
+
+                        chainComplete = false;
+                        break;
+                    }
+                }
+            }
+
+            // =========================================================
+            // PHASE 1: STRICT CHAIN MODE (Overrides everything else)
+            // =========================================================
+            if (chainEnabled && strictMode && !chainComplete && targetChainItem != null)
+            {
+                foreach (var kvp in _itemDataCache)
+                {
+                    ItemData itemData = kvp.Value;
+                    EItemRarity rarity = itemData.rarity;
+                    List<ItemData> lootList = null;
+                    if (!RunUnlockables.availableItems.TryGetValue(rarity, out lootList) || lootList == null) continue;
+                    if (!_allowedItems.Contains(itemData.eItem)) continue;
+
+                    bool isInPool = lootList.Contains(itemData);
+                    bool shouldAdd = false;
+
+                    // RULES:
+                    // 1. Target Chain Item: ALWAYS ALLOW
+                    // 2. Key: ALLOW ONLY IF Key Count < 10
+                    // 3. Everything Else: BAN
+
+                    if (itemData.eItem == targetChainItem.eItem)
+                    {
+                        shouldAdd = true;
+                    }
+                    else if (itemData.eItem == EItem.Key)
+                    {
+                        if (currentKeys < keyTarget) shouldAdd = true;
+                    }
+                    else
+                    {
+                        shouldAdd = false;
+                    }
+
+                    if (shouldAdd) { if (!isInPool) lootList.Add(itemData); }
+                    else { if (isInPool) lootList.Remove(itemData); }
+                }
+                // Return here so Strict Mode exclusivity is maintained
+                return;
+            }
+
+            // =========================================================
+            // PHASE 2: KEYS FIRST MODE (If Strict Mode isn't active/complete)
+            // =========================================================
             if (keysFirstEnabled && currentKeys < keyTarget)
             {
-                // PHASE 1: KEYS FIRST MODE
                 foreach (var kvp in _itemDataCache)
                 {
                     ItemData itemData = kvp.Value;
@@ -234,41 +329,57 @@ namespace IntuitiveItems
                     bool isKey = (itemData.eItem == EItem.Key);
                     bool isLegendary = (rarity == EItemRarity.Legendary);
                     bool isCreditCard = (itemData.eItem == EItem.CreditCardGreen || itemData.eItem == EItem.CreditCardRed);
-
                     bool isInPool = lootList.Contains(itemData);
 
-                    // ALLOW: Key, Legendaries, Credit Cards
-                    if (isKey || isLegendary || isCreditCard)
-                    {
-                        if (!isInPool) lootList.Add(itemData);
-                    }
-                    else
-                    {
-                        // BAN: Everything else
-                        if (isInPool) lootList.Remove(itemData);
-                    }
+                    // Keys First Rules: Keys + Legendaries + Cards
+                    if (isKey || isLegendary || isCreditCard) { if (!isInPool) lootList.Add(itemData); }
+                    else { if (isInPool) lootList.Remove(itemData); }
                 }
+                return;
             }
-            else
+
+            // =========================================================
+            // PHASE 3: STANDARD MODE (Limits + Chain Lockout)
+            // =========================================================
+            foreach (var kvp in _itemDataCache)
             {
-                // PHASE 2: STANDARD MODE
-                foreach (var kvp in _itemDataCache)
+                EItem itemEnum = kvp.Key;
+                ItemData itemData = kvp.Value;
+                EItemRarity rarity = itemData.rarity;
+                List<ItemData> lootList = null;
+                if (!RunUnlockables.availableItems.TryGetValue(rarity, out lootList) || lootList == null) continue;
+                if (!_allowedItems.Contains(itemEnum)) continue;
+
+                int limit = -1;
+                if (_itemLimits.ContainsKey(itemEnum)) limit = _itemLimits[itemEnum].Value;
+                bool isInPool = lootList.Contains(itemData);
+
+                if (limit < 0) { if (!isInPool) lootList.Add(itemData); continue; }
+                int currentAmount = player.inventory.itemInventory.GetAmount(itemEnum);
+                if (currentAmount >= limit) { if (isInPool) lootList.Remove(itemData); }
+                else { if (!isInPool) lootList.Add(itemData); }
+            }
+
+            // Apply Chain Lockout (Sequential Unlock logic for Non-Strict Chain)
+            if (chainEnabled && !strictMode && _parsedChainList.Count > 1)
+            {
+                for (int i = 1; i < _parsedChainList.Count; i++)
                 {
-                    EItem itemEnum = kvp.Key;
-                    ItemData itemData = kvp.Value;
-                    EItemRarity rarity = itemData.rarity;
+                    EItem prevItem = _parsedChainList[i - 1];
+                    EItem currItem = _parsedChainList[i];
+
+                    if (!_itemDataCache.ContainsKey(currItem)) continue;
+                    ItemData currData = _itemDataCache[currItem];
+
                     List<ItemData> lootList = null;
-                    if (!RunUnlockables.availableItems.TryGetValue(rarity, out lootList) || lootList == null) continue;
-                    if (!_allowedItems.Contains(itemEnum)) continue;
-
-                    int limit = -1;
-                    if (_itemLimits.ContainsKey(itemEnum)) limit = _itemLimits[itemEnum].Value;
-                    bool isInPool = lootList.Contains(itemData);
-
-                    if (limit < 0) { if (!isInPool) lootList.Add(itemData); continue; }
-                    int currentAmount = player.inventory.itemInventory.GetAmount(itemEnum);
-                    if (currentAmount >= limit) { if (isInPool) lootList.Remove(itemData); }
-                    else { if (!isInPool) lootList.Add(itemData); }
+                    if (RunUnlockables.availableItems.TryGetValue(currData.rarity, out lootList) && lootList != null)
+                    {
+                        int prevAmt = player.inventory.itemInventory.GetAmount(prevItem);
+                        if (prevAmt < 1 && lootList.Contains(currData))
+                        {
+                            lootList.Remove(currData); // Lock current if previous missing
+                        }
+                    }
                 }
             }
         }
@@ -286,6 +397,7 @@ namespace IntuitiveItems
         private RectTransform _toggleHandle;
 
         private ItemData _currentItem;
+        private bool _lastKnownToggleState;
 
         public ConfigInputBehavior(IntPtr ptr) : base(ptr) { }
 
@@ -329,6 +441,36 @@ namespace IntuitiveItems
                 _currentItem = item;
                 RefreshUI();
             }
+            else
+            {
+                CheckForExternalConfigChanges();
+            }
+        }
+
+        private void CheckForExternalConfigChanges()
+        {
+            if (_currentItem == null) return;
+            if (!_toggleRoot.activeSelf) return;
+
+            bool currentConfigState = false;
+
+            if (_currentItem.eItem == EItem.Key)
+            {
+                currentConfigState = Core.Instance._keysFirstConfig.Value;
+            }
+            else if (Core.Instance._parsedChainList.Count > 0 && _currentItem.eItem == Core.Instance._parsedChainList[0])
+            {
+                currentConfigState = Core.Instance._chainEnabledConfig.Value;
+            }
+            else if (Core.Instance._parsedChainList.Count > 1 && _currentItem.eItem == Core.Instance._parsedChainList[1])
+            {
+                currentConfigState = Core.Instance._strictChainConfig.Value;
+            }
+
+            if (currentConfigState != _lastKnownToggleState)
+            {
+                UpdateToggleVisuals(currentConfigState);
+            }
         }
 
         private void HideAllUI()
@@ -344,7 +486,7 @@ namespace IntuitiveItems
             _limitRoot.SetActive(false);
 
             RectTransform borderRect = _limitRoot.AddComponent<RectTransform>();
-            borderRect.anchorMin = new Vector2(1, 0); // Bottom Right
+            borderRect.anchorMin = new Vector2(1, 0);
             borderRect.anchorMax = new Vector2(1, 0);
             borderRect.pivot = new Vector2(1, 0);
             borderRect.sizeDelta = new Vector2(26, 26);
@@ -389,16 +531,14 @@ namespace IntuitiveItems
 
         private void CreateToggleUI()
         {
-            // 1. OUTER WHITE BORDER (Root)
             _toggleRoot = new GameObject("KeysFirstToggle");
             _toggleRoot.transform.SetParent(this.transform, false);
             _toggleRoot.SetActive(false);
 
             RectTransform rect = _toggleRoot.AddComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0, 0); // Bottom Left
+            rect.anchorMin = new Vector2(0, 0);
             rect.anchorMax = new Vector2(0, 0);
             rect.pivot = new Vector2(0, 0);
-            // Increased size to accommodate borders (30+4, 16+4)
             rect.sizeDelta = new Vector2(34, 20);
             rect.anchoredPosition = new Vector2(5, 5);
 
@@ -406,37 +546,33 @@ namespace IntuitiveItems
             btn.onClick.AddListener((UnityAction)OnToggleClicked);
 
             Image outerImg = _toggleRoot.AddComponent<Image>();
-            outerImg.color = Color.white; // OUTER BORDER
+            outerImg.color = Color.white;
 
-            // 2. INNER BLACK BORDER
             GameObject blackBorder = new GameObject("InnerBlack");
             blackBorder.transform.SetParent(_toggleRoot.transform, false);
             RectTransform blackRect = blackBorder.AddComponent<RectTransform>();
             blackRect.anchorMin = Vector2.zero;
             blackRect.anchorMax = Vector2.one;
             blackRect.sizeDelta = Vector2.zero;
-            blackRect.offsetMin = new Vector2(1, 1); // 1px padding
+            blackRect.offsetMin = new Vector2(1, 1);
             blackRect.offsetMax = new Vector2(-1, -1);
-
             Image blackImg = blackBorder.AddComponent<Image>();
             blackImg.color = Color.black;
 
-            // 3. COLORED CONTENT
             GameObject contentObj = new GameObject("ToggleContent");
             contentObj.transform.SetParent(blackBorder.transform, false);
             RectTransform contentRect = contentObj.AddComponent<RectTransform>();
             contentRect.anchorMin = Vector2.zero;
             contentRect.anchorMax = Vector2.one;
             contentRect.sizeDelta = Vector2.zero;
-            contentRect.offsetMin = new Vector2(1, 1); // 1px padding
+            contentRect.offsetMin = new Vector2(1, 1);
             contentRect.offsetMax = new Vector2(-1, -1);
 
             _toggleBg = contentObj.AddComponent<Image>();
-            _toggleBg.color = Color.black; // Default Off
+            _toggleBg.color = Color.black;
 
-            // 4. HANDLE (White Square)
             GameObject handleObj = new GameObject("Handle");
-            handleObj.transform.SetParent(contentObj.transform, false); // Parent to Content
+            handleObj.transform.SetParent(contentObj.transform, false);
 
             _toggleHandle = handleObj.AddComponent<RectTransform>();
             _toggleHandle.sizeDelta = new Vector2(12, 12);
@@ -459,6 +595,7 @@ namespace IntuitiveItems
                 return;
             }
 
+            // Limit Box
             if (Core.Instance._itemLimits.TryGetValue(_currentItem.eItem, out var entry))
             {
                 _limitRoot.SetActive(true);
@@ -470,11 +607,33 @@ namespace IntuitiveItems
                 _limitRoot.SetActive(false);
             }
 
+            // Toggle Switches
+            bool showToggle = false;
+            bool toggleState = false;
+
+            // 1. KEY (Keys First)
             if (_currentItem.eItem == EItem.Key)
             {
+                showToggle = true;
+                toggleState = Core.Instance._keysFirstConfig.Value;
+            }
+            // 2. CHAIN START (Chain Enabled) - Index 0
+            else if (Core.Instance._parsedChainList.Count > 0 && _currentItem.eItem == Core.Instance._parsedChainList[0])
+            {
+                showToggle = true;
+                toggleState = Core.Instance._chainEnabledConfig.Value;
+            }
+            // 3. STRICT MODE (Strict Chain) - Index 1
+            else if (Core.Instance._parsedChainList.Count > 1 && _currentItem.eItem == Core.Instance._parsedChainList[1])
+            {
+                showToggle = true;
+                toggleState = Core.Instance._strictChainConfig.Value;
+            }
+
+            if (showToggle)
+            {
                 _toggleRoot.SetActive(true);
-                bool isOn = Core.Instance._keysFirstConfig.Value;
-                UpdateToggleVisuals(isOn);
+                UpdateToggleVisuals(toggleState);
             }
             else
             {
@@ -484,6 +643,8 @@ namespace IntuitiveItems
 
         private void UpdateToggleVisuals(bool isOn)
         {
+            _lastKnownToggleState = isOn;
+
             if (isOn)
             {
                 _toggleBg.color = new Color(0, 0.8f, 0); // Green
@@ -504,10 +665,29 @@ namespace IntuitiveItems
 
         private void OnToggleClicked()
         {
-            bool current = Core.Instance._keysFirstConfig.Value;
-            Core.Instance._keysFirstConfig.Value = !current;
-            Core.Instance.Config.Save();
-            UpdateToggleVisuals(!current);
+            if (_currentItem.eItem == EItem.Key)
+            {
+                bool current = Core.Instance._keysFirstConfig.Value;
+                Core.Instance._keysFirstConfig.Value = !current;
+                Core.Instance.Config.Save();
+                UpdateToggleVisuals(!current);
+            }
+            else if (Core.Instance._parsedChainList.Count > 0 && _currentItem.eItem == Core.Instance._parsedChainList[0])
+            {
+                bool current = Core.Instance._chainEnabledConfig.Value;
+                Core.Instance._chainEnabledConfig.Value = !current;
+                if (current == true) Core.Instance._strictChainConfig.Value = false;
+                Core.Instance.Config.Save();
+                UpdateToggleVisuals(!current);
+            }
+            else if (Core.Instance._parsedChainList.Count > 1 && _currentItem.eItem == Core.Instance._parsedChainList[1])
+            {
+                bool current = Core.Instance._strictChainConfig.Value;
+                if (!current && !Core.Instance._chainEnabledConfig.Value) Core.Instance._chainEnabledConfig.Value = true;
+                Core.Instance._strictChainConfig.Value = !current;
+                Core.Instance.Config.Save();
+                UpdateToggleVisuals(!current);
+            }
         }
 
         private void OnValueChanged(string val)
