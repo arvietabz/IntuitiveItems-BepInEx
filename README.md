@@ -14,7 +14,7 @@ An intelligent inventory manager that lets you define a maximum carry limit for 
 ### Core Features
 
 *   **Smart Loot Filter:** Once you reach your configured limit for an item (e.g., 3 Moldy Cheese), the mod temporarily removes it from the drop table. This naturally boosts the odds of rolling items you actually need.
-*   **Dynamic Restoration:** If your inventory count drops below the limit (for example, after using a Key or microwaving an item), the mod immediately detects the change and adds the item back into rotation.
+*   **Dynamic Restoration:** If your inventory count drops below the limit (for example, after using a Key to microwaving an item), the mod immediately detects the change and adds the item back into rotation.
 *   **In-Game Configuration:** No need to edit text files! Small input boxes appear directly on your item icons in the menu.
 *   **"Keys First" Mode:** A special toggle that forces the game to prioritize Keys, Credit Cards, and Legendaries early in the run.
 
@@ -34,6 +34,15 @@ On the **Key** item icon, there is a toggle switch at the bottom-left.
     *   **Effect:** The game will **ONLY** drop Keys, Legendaries, and Credit Cards.
     *   **Goal:** This forces you to reach your Key Cap (default 10) quickly.
     *   **Completion:** Once you have 10 Keys, the restriction lifts automatically, and all other unlocked items begin spawning normally.
+
+#### 3. Progression Chain (or 4. Strict Mode)
+*   **Toggle:** Switch on **SpicyMeatball** (Enable Chain) and **JoesDagger** (Strict Mode).
+*   **Effect:** Forces items to spawn in a specific order defined in the config.
+*   **Strict Behavior:** This is a "Hardcore Target" mode. It removes **everything** from the pool (even Legendaries and Cards) except:
+    1.  The **Current Target Item** (e.g., SpicyMeatball).
+    2.  **Keys** (only if you have less than 10).
+*   **Progression:** Once you get **1 copy** of the target, it is removed, and the next item in the chain unlocks immediately.
+*   **Default Order:** `SpicyMeatball` -> `JoesDagger` -> `Bonker` -> `SluttyCannon` -> `CursedDoll`.
 
 ---
 
